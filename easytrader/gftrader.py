@@ -13,6 +13,7 @@ import six
 
 from . import helpers
 from .webtrader import WebTrader
+from .webtrader import NotLoginError
 
 log = helpers.get_logger(__file__)
 
@@ -112,10 +113,18 @@ class GFTrader(WebTrader):
 
     def format_response_data(self, data):
         if six.PY2:
-            return_data = json.loads(data.encode('utf-8'))
+            try:
+                return_data = json.loads(data.encode('utf-8'))
+            except ValueError:
+                return None
         else:
             return_data = json.loads(str(data, 'utf-8'))
         return return_data
+
+    def check_login_status(self, return_data):
+        if return_data is None:
+            self.heart_active = False
+            raise NotLoginError
 
     def check_account_live(self, response):
         if hasattr(response, 'data') and response.get('error_no') == '-1':
