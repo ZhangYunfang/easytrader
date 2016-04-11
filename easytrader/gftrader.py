@@ -123,7 +123,6 @@ class GFTrader(WebTrader):
 
     def check_login_status(self, return_data):
         if return_data is None:
-            self.heart_active = False
             raise NotLoginError
 
     def check_account_live(self, response):
