@@ -129,6 +129,14 @@ class WebTrader(object):
         return self.do(self.config['entrust'])
 
     @property
+    def blotter(self):
+        return self.get_blotter()
+
+    def get_blotter(self):
+        """获取当日成交"""
+        log.info('目前仅在 广发子类 中实现, 其余券商需要补充')
+
+    @property
     def current_deal(self):
         return self.get_current_deal()
 

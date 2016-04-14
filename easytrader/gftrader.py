@@ -194,6 +194,10 @@ class GFTrader(WebTrader):
         )
         return self.__trade(stock_code, price, other=params)
 
+    def get_blotter(self):
+        """获取当日成交"""
+        return self.do(self.config['blotter'])
+
     def fund_subscribe(self, stock_code, price=0, entrust_prop='LFS'):
         """基金认购
         :param stock_code: 基金代码
