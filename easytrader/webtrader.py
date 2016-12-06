@@ -71,13 +71,14 @@ class WebTrader(object):
         """映射用户名密码到对应的字段"""
         raise Exception('支持参数登录需要实现此方法')
 
-    def autologin(self, limit=10):
+    def autologin(self, limit=600):
         """实现自动登录
         :param limit: 登录次数限制
         """
-        for _ in range(limit):
+        for _retry in range(limit):
             if self.login():
                 break
+            time.sleep(0.5 * _retry)
         else:
             raise NotLoginError('登录失败次数过多, 请检查密码是否正确 / 券商服务器是否处于维护中 / 网络连接是否正常')
         self.keepalive()

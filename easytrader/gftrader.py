@@ -91,7 +91,13 @@ class GFTrader(WebTrader):
         )
         login_response = self.s.post(self.config['login_api'], params=login_params)
         log.info('login response: {}'.format(login_response.text))
-        if login_response.json()['success'] == True:
+        try:
+            ret_json = login_response.json()
+        except ValueError as e:
+            log.exception('login response decode json fail: {}'.format(login_response.text))
+            return False, login_response.text
+
+        if ret_json['success'] == True:
             v = login_response.headers
             self.sessionid = v['Set-Cookie'][-SESSIONIDPOS:]
             self.__set_trade_need_info()
