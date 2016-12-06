@@ -1,10 +1,12 @@
+bs4
 requests
 demjson
-logbook
 anyjson
 dill
 click
 six
 flask
-
-
+Pillow
+pytesseract
+pandas
+pyperclip

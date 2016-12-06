@@ -1,4 +1,5 @@
 # coding: utf-8
+import logging
 import os
 import re
 import time
@@ -7,20 +8,27 @@ from threading import Thread
 import six
 
 from . import helpers
+from .log import log
 
 if six.PY2:
     import sys
 
+    stdi, stdo, stde = sys.stdin, sys.stdout, sys.stderr  # 获取标准输入、标准输出和标准错误输出
     reload(sys)
+    sys.stdin, sys.stdout, sys.stderr = stdi, stdo, stde  # 保持标准输入、标准输出和标准错误输出
     sys.setdefaultencoding('utf8')
-
-log = helpers.get_logger(__file__)
 
 
 class NotLoginError(Exception):
     def __init__(self, result=None):
         super(NotLoginError, self).__init__()
         self.result = result
+
+
+class TradeError(Exception):
+    def __init__(self, message=None):
+        super(TradeError, self).__init__()
+        self.message = message
 
 
 class WebTrader(object):
@@ -32,11 +40,8 @@ class WebTrader(object):
         self.trade_prefix = self.config['prefix']
         self.account_config = ''
         self.heart_active = True
-        if six.PY2:
-            self.heart_thread = Thread(target=self.send_heartbeat)
-            self.heart_thread.setDaemon(True)
-        else:
-            self.heart_thread = Thread(target=self.send_heartbeat, daemon=True)
+        self.heart_thread = Thread(target=self.send_heartbeat)
+        self.heart_thread.setDaemon(True)
 
     def read_config(self, path):
         try:
@@ -47,12 +52,24 @@ class WebTrader(object):
             if type(v) is int:
                 log.warn('配置文件的值最好使用双引号包裹，使用字符串类型，否则可能导致不可知的问题')
 
-    def prepare(self, need_data):
+    def prepare(self, config_file=None, user=None, password=None, **kwargs):
         """登录的统一接口
-        :param need_data 登录所需数据
+        :param config_file 登录数据文件，若无则选择参数登录模式
+        :param user: 各家券商的账号或者雪球的用户名
+        :param password: 密码, 券商为加密后的密码，雪球为明文密码
+        :param account: [雪球登录需要]雪球手机号(邮箱手机二选一)
+        :param portfolio_code: [雪球登录需要]组合代码
+        :param portfolio_market: [雪球登录需要]交易市场， 可选['cn', 'us', 'hk'] 默认 'cn'
         """
-        self.read_config(need_data)
+        if config_file is not None:
+            self.read_config(config_file)
+        else:
+            self._prepare_account(user, password, **kwargs)
         self.autologin()
+
+    def _prepare_account(self, user, password, **kwargs):
+        """映射用户名密码到对应的字段"""
+        raise Exception('支持参数登录需要实现此方法')
 
     def autologin(self, limit=10):
         """实现自动登录
@@ -80,11 +97,16 @@ class WebTrader(object):
         while True:
             if self.heart_active:
                 try:
+                    log_level = log.level
+
+                    log.setLevel(logging.ERROR)
                     response = self.heartbeat()
                     self.check_account_live(response)
+
+                    log.setLevel(log_level)
                 except:
-                    pass
-                time.sleep(10)
+                    self.autologin()
+                time.sleep(30)
             else:
                 time.sleep(1)
 
@@ -143,8 +165,7 @@ class WebTrader(object):
     def get_current_deal(self):
         """获取当日委托列表"""
         # return self.do(self.config['current_deal'])
-        # TODO 目前仅在 佣金宝子类 中实现
-        log.info('目前仅在 佣金宝/银河子类 中实现, 其余券商需要补充')
+        log.warning('目前仅在 佣金宝/银河子类 中实现, 其余券商需要补充')
 
     @property
     def exchangebill(self):
@@ -163,8 +184,15 @@ class WebTrader(object):
         :param end_date: 20160211
         :return:
         """
-        # TODO 目前仅在 华泰子类 中实现
-        log.info('目前仅在 华泰子类 中实现, 其余券商需要补充')
+        log.warning('目前仅在 华泰子类 中实现, 其余券商需要补充')
+
+    def get_ipo_limit(self, stock_code):
+        """
+        查询新股申购额度申购上限
+        :param stock_code: 申购代码 ID
+        :return:
+        """
+        log.warning('目前仅在 佣金宝子类 中实现, 其余券商需要补充')
 
     def do(self, params):
         """发起对 api 的请求并过滤返回结果
@@ -172,7 +200,11 @@ class WebTrader(object):
         request_params = self.create_basic_params()
         request_params.update(params)
         response_data = self.request(request_params)
-        format_json_data = self.format_response_data(response_data)
+        try:
+            format_json_data = self.format_response_data(response_data)
+        except:
+            # Caused by server force logged out
+            return None
         return_data = self.fix_error_data(format_json_data)
         try:
             self.check_login_status(return_data)
